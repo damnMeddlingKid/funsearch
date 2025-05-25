@@ -14,9 +14,13 @@
 # ==============================================================================
 
 """Class for sampling new programs."""
+import os
 from collections.abc import Collection, Sequence
 
+
 import numpy as np
+from google import genai
+from google.genai import types
 
 from funsearch.implementation import evaluator
 from funsearch.implementation import programs_database
@@ -27,10 +31,26 @@ class LLM:
 
   def __init__(self, samples_per_prompt: int) -> None:
     self._samples_per_prompt = samples_per_prompt
+    self._client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
 
   def _draw_sample(self, prompt: str) -> str:
     """Returns a predicted continuation of `prompt`."""
-    raise NotImplementedError('Must provide a language model.')
+    response = self._client.models.generate_content(
+      model='gemini-2.0-flash-001',
+      contents=prompt,
+      config=types.GenerateContentConfig(
+          system_instruction="""
+          You are a professional computer scientist skilled in optimizing programs.
+          Here is a python program along with a few versions of a function we would like to optimize. 
+          Complete the next version of the function with an implementation that is better than the previous attempts.
+          
+          IMPORTANT: Return only Python code without any markdown formatting, backticks, or code blocks.
+          Do not include ```python or ``` in your response. 
+          """,
+          temperature=0.3,
+      ),
+    )
+    return response.text
 
   def draw_samples(self, prompt: str) -> Collection[str]:
     """Returns multiple predicted continuations of `prompt`."""

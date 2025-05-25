@@ -1,0 +1,18 @@
+[project]
+name = "funsearch"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "jax==0.6.1",
+    "absl-py==2.2.2",
+    "modal>=1.0.1",
+    "google-genai==1.16.1",
+    "RestrictedPython==8.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["funsearch*"]

@@ -18,6 +18,10 @@ import ast
 from collections.abc import Sequence
 import copy
 from typing import Any
+import signal
+
+from RestrictedPython import compile_restricted
+from RestrictedPython.Guards import safe_globals, safe_builtins
 
 from funsearch.implementation import code_manipulation
 from funsearch.implementation import programs_database
@@ -96,8 +100,56 @@ class Sandbox:
       timeout_seconds: int,
   ) -> tuple[Any, bool]:
     """Returns `function_to_run(test_input)` and whether execution succeeded."""
-    raise NotImplementedError(
-        'Must provide a sandbox for executing untrusted code.')
+    def timeout_handler(signum, frame):
+      raise TimeoutError("Execution timed out")
+    
+    try:
+      # Set up timeout
+      signal.signal(signal.SIGALRM, timeout_handler)
+      signal.alarm(timeout_seconds)
+      
+      # Compile with RestrictedPython
+      byte_code = compile_restricted(program, filename="<sandbox>", mode="exec")
+      if byte_code is None:
+        return None, False
+      
+      # Create safe execution environment
+      restricted_globals = {
+        '__builtins__': safe_builtins,
+        '__name__': '__main__',
+        'range': range,
+        'len': len,
+        'max': max,
+        'min': min,
+        'sum': sum,
+        'abs': abs,
+        'int': int,
+        'float': float,
+        'str': str,
+        'list': list,
+        'dict': dict,
+        'set': set,
+        'tuple': tuple,
+      }
+      
+      local_namespace = {}
+      
+      # Execute the program
+      exec(byte_code, restricted_globals, local_namespace)
+      
+      # Get and run the target function
+      if function_to_run not in local_namespace:
+        return None, False
+      
+      func = local_namespace[function_to_run]
+      result = func(test_input)
+      
+      return result, True
+      
+    except Exception:
+      return None, False
+    finally:
+      signal.alarm(0)  # Cancel the alarm
 
 
 def _calls_ancestor(program: str, function_to_evolve: str) -> bool:
