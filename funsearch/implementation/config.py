@@ -51,9 +51,11 @@ class Config:
         can execute in parallel as part of a distributed system.
     samples_per_prompt: How many independently sampled program continuations to
         obtain for each prompt.
+    max_iterations: Maximum number of sampling iterations to run.
   """
   programs_database: ProgramsDatabaseConfig = dataclasses.field(
       default_factory=ProgramsDatabaseConfig)
   num_samplers: int = 15
   num_evaluators: int = 140
   samples_per_prompt: int = 4
+  max_iterations: int = 100

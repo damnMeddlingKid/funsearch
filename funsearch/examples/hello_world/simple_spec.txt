@@ -1,0 +1,28 @@
+import time
+
+"""Lets implement an efficient sorting algorithm that doesnt use the standard library sorted."""
+
+@funsearch.run
+def evaluate(numbers: str) -> int:
+  input_list = [int(a) for a in numbers.split(",")]
+  eval_list = [int(a) for a in numbers.split(",")]
+  start = time.time()
+  result = sort(input_list)
+  end = time.time()
+  duration = end - start
+  if sorted(eval_list) == result:
+    return -duration
+  return -1
+
+
+@funsearch.evolve
+def sort(x):
+  """sort the given input.
+
+  Args:
+    x: list on int
+
+  Returns:
+    A list of sorted int
+  """
+  return []

@@ -12,6 +12,7 @@ dependencies = [
     "modal>=1.0.1",
     "google-genai==1.16.1",
     "RestrictedPython==8.0",
+    "ipdb>=0.13.13",
 ]
 
 [tool.setuptools.packages.find]

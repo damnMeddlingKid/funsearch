@@ -15,13 +15,15 @@
 
 """Class for evaluating programs proposed by the Sampler."""
 import ast
+import time
 from collections.abc import Sequence
 import copy
 from typing import Any
 import signal
 
 from RestrictedPython import compile_restricted
-from RestrictedPython.Guards import safe_globals, safe_builtins
+from RestrictedPython.Guards import safe_globals, safe_builtins, guarded_unpack_sequence, full_write_guard
+from RestrictedPython.transformer import ALLOWED_FUNC_NAMES
 
 from funsearch.implementation import code_manipulation
 from funsearch.implementation import programs_database
@@ -66,6 +68,7 @@ def _trim_function_body(generated_code: str) -> str:
   visitor = _FunctionLineVisitor('fake_function_header')
   visitor.visit(tree)
   body_lines = code.splitlines()[1:visitor.function_end_line]
+ 
   return '\n'.join(body_lines) + '\n\n'
 
 
@@ -76,13 +79,13 @@ def _sample_to_program(
     function_to_evolve: str,
 ) -> tuple[code_manipulation.Function, str]:
   """Returns the compiled generated function and the full runnable program."""
-  body = _trim_function_body(generated_code)
+  #body = _trim_function_body(generated_code)
+  body = generated_code
   if version_generated is not None:
     body = code_manipulation.rename_function_calls(
         body,
         f'{function_to_evolve}_v{version_generated}',
         function_to_evolve)
-
   program = copy.deepcopy(template)
   evolved_function = program.get_function(function_to_evolve)
   evolved_function.body = body
@@ -101,7 +104,8 @@ class Sandbox:
   ) -> tuple[Any, bool]:
     """Returns `function_to_run(test_input)` and whether execution succeeded."""
     def timeout_handler(signum, frame):
-      raise TimeoutError("Execution timed out")
+      pass
+      #raise TimeoutError("Execution timed out")
     
     try:
       # Set up timeout
@@ -114,9 +118,32 @@ class Sandbox:
         return None, False
       
       # Create safe execution environment
+      safe_builtins_dict = safe_builtins.copy()
+      safe_builtins_dict['__import__'] = __import__
+      
+      # Create dummy funsearch module with decorators
+      class FunSearchModule:
+        @staticmethod
+        def run(func):
+          """Dummy decorator for @funsearch.run"""
+          return func
+        
+        @staticmethod
+        def evolve(func):
+          """Dummy decorator for @funsearch.evolve"""
+          return func
+      
       restricted_globals = {
-        '__builtins__': safe_builtins,
+        '__builtins__': safe_builtins_dict,
         '__name__': '__main__',
+        'funsearch': FunSearchModule(),
+        'time': time,
+        '_getiter_': iter,
+        '_getattr_': getattr,
+        '_iter_unpack_sequence_': iter,
+        '_getitem_': lambda obj, key: obj[key],
+        '_unpack_sequence_': guarded_unpack_sequence,
+        '_write_': full_write_guard,
         'range': range,
         'len': len,
         'max': max,
@@ -135,18 +162,19 @@ class Sandbox:
       local_namespace = {}
       
       # Execute the program
-      exec(byte_code, restricted_globals, local_namespace)
-      
+      exec(byte_code, restricted_globals)
+
       # Get and run the target function
-      if function_to_run not in local_namespace:
+      if function_to_run not in restricted_globals:
         return None, False
-      
-      func = local_namespace[function_to_run]
+      print(f"about to evaluate the following program\n{program}")
+      func = restricted_globals[function_to_run]
       result = func(test_input)
       
       return result, True
       
-    except Exception:
+    except Exception as e:
+      print(e)
       return None, False
     finally:
       signal.alarm(0)  # Cancel the alarm

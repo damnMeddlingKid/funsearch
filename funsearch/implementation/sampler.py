@@ -35,6 +35,7 @@ class LLM:
 
   def _draw_sample(self, prompt: str) -> str:
     """Returns a predicted continuation of `prompt`."""
+    print(f"LLM PROMPT:\n{prompt}\n" + "="*50)
     response = self._client.models.generate_content(
       model='gemini-2.0-flash-001',
       contents=prompt,
@@ -44,12 +45,18 @@ class LLM:
           Here is a python program along with a few versions of a function we would like to optimize. 
           Complete the next version of the function with an implementation that is better than the previous attempts.
           
-          IMPORTANT: Return only Python code without any markdown formatting, backticks, or code blocks.
+          <IMPORTANT>
+          - Return only the completion of the Python code without any markdown formatting, backticks, or code blocks.
           Do not include ```python or ``` in your response. 
+
+          - Only write function you are being asked to complete.
+          dont implement other parts of the code, don't implement other versions of the function.
+          </IMPORTANT>
           """,
           temperature=0.3,
       ),
     )
+    print(f"LLM RESPONSE:\n{response.text}\n" + "="*50)
     return response.text
 
   def draw_samples(self, prompt: str) -> Collection[str]:
@@ -72,11 +79,10 @@ class Sampler:
 
   def sample(self):
     """Continuously gets prompts, samples programs, sends them for analysis."""
-    while True:
-      prompt = self._database.get_prompt()
-      samples = self._llm.draw_samples(prompt.code)
-      # This loop can be executed in parallel on remote evaluator machines.
-      for sample in samples:
-        chosen_evaluator = np.random.choice(self._evaluators)
-        chosen_evaluator.analyse(
-            sample, prompt.island_id, prompt.version_generated)
+    prompt = self._database.get_prompt()
+    samples = self._llm.draw_samples(prompt.code)
+    # This loop can be executed in parallel on remote evaluator machines.
+    for sample in samples:
+      chosen_evaluator = np.random.choice(self._evaluators)
+      chosen_evaluator.analyse(
+          sample, prompt.island_id, prompt.version_generated)

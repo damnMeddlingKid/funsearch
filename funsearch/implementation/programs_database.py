@@ -144,6 +144,16 @@ class ProgramsDatabase:
       self._last_reset_time = time.time()
       self.reset_islands()
 
+  def get_best_program(self) -> str | None:
+    """Returns the best program across all islands as a string."""
+    if not any(score > -float('inf') for score in self._best_score_per_island):
+      return None
+    
+    best_score = max(self._best_score_per_island)
+    best_island_id = self._best_score_per_island.index(best_score)
+    best_program = self._best_program_per_island[best_island_id]
+    return str(best_program) if best_program is not None else None
+
   def reset_islands(self) -> None:
     """Resets the weaker half of islands."""
     # We sort best scores after adding minor noise to break ties.
@@ -187,6 +197,9 @@ class Island:
 
     self._clusters: dict[Signature, Cluster] = {}
     self._num_programs: int = 0
+    base_function = template.get_function(function_to_evolve)
+    base_scores = {0: -1.0}
+    self.register_program(base_function, base_scores)
 
   def register_program(
       self,
@@ -230,7 +243,7 @@ class Island:
 
     indices = np.argsort(scores)
     sorted_implementations = [implementations[i] for i in indices]
-    version_generated = len(sorted_implementations) + 1
+    version_generated = len(sorted_implementations)
     return self._generate_prompt(sorted_implementations), version_generated
 
   def _generate_prompt(
@@ -265,9 +278,10 @@ class Island:
                    f'`{self._function_to_evolve}_v{next_version - 1}`.'),
     )
     versioned_functions.append(header)
-
     # Replace functions in the template with the list constructed here.
-    prompt = dataclasses.replace(self._template, functions=versioned_functions)
+    existing_functions = copy.deepcopy(self._template.functions)
+    existing_functions.extend(versioned_functions)
+    prompt = dataclasses.replace(self._template, functions=existing_functions)
     return str(prompt)
 
 
